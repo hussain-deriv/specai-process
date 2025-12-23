@@ -1,0 +1,13 @@
+version: v2
+modules:
+  - path: proto
+# uncomment deps section if you are using google.api.http options
+# and then run `buf dep update`
+#deps:
+#  - buf.build/googleapis/googleapis
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - STANDARD

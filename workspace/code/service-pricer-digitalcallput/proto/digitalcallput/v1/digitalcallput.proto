@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package digitalcallput.v1;
+
+option go_package="github.com/regentmarkets/service-pricer-digitalcallput/api/digitalcallput";
+
+// PricingService provides real-time pricing for digital call/put options
+service PricingService {
+  // GetAsk calculates a single ask price for a digital option proposal
+  rpc GetAsk(GetAskRequest) returns (GetAskResponse);
+  
+  // StreamAsk streams continuous ask price updates for a digital option proposal
+  rpc StreamAsk(GetAskRequest) returns (stream GetAskResponse);
+  
+  // GetBid calculates a single bid price for an active contract
+  rpc GetBid(GetBidRequest) returns (GetBidResponse);
+  
+  // StreamBid streams continuous bid price updates for an active contract
+  rpc StreamBid(GetBidRequest) returns (stream GetBidResponse);
+}
+
+// ContractType defines the direction of the digital option
+enum ContractType {
+  CONTRACT_TYPE_UNSPECIFIED = 0;
+  CONTRACT_TYPE_CALL = 1;  // Wins if exit_spot > barrier
+  CONTRACT_TYPE_PUT = 2;   // Wins if exit_spot < barrier
+}
+
+// OptionParameters specifies the contract parameters for pricing
+message OptionParameters {
+  // Symbol is the underlying asset identifier (e.g., "EUR/USD")
+  string symbol = 1;
+  
+  // ContractType is the option direction (CALL or PUT)
+  ContractType contract_type = 2;
+  
+  // Currency is the payout currency code (e.g., "USD")
+  string currency = 3;
+  
+  // Duration is the contract duration (e.g., "5m", "10t", "30s")
+  // Format: \d+[smhdt] where s=seconds, m=minutes, h=hours, d=days, t=ticks
+  string duration = 4;
+  
+  // Barrier is the strike price specification (optional)
+  // Formats: "+50" (relative), "-100" (relative), "1.2345" (absolute), or empty (defaults to entry spot)
+  optional string barrier = 5;
+  
+  // StartTime is the contract start timestamp (required for bid requests only)
+  // Unix epoch timestamp in seconds
+  optional int64 start_time = 6;
+  
+  // Stake is the premium amount (decimal string)
+  string stake = 7;
+}
+
+// Limits contains trading constraints
+message Limits {
+  // MaxPayout is the maximum allowed payout amount
+  string max_payout = 1;
+  
+  // MinStake is the minimum required stake amount
+  string min_stake = 2;
+}
+
+// GetAskRequest is the request for ask price calculation
+message GetAskRequest {
+  // OptionParameters specifies the contract parameters
+  OptionParameters option_parameters = 1;
+  
+  // PricingTime is the timestamp for pricing (optional, defaults to current time)
+  // Unix epoch timestamp in seconds
+  optional int64 pricing_time = 2;
+}
+
+// GetAskResponse contains the ask price calculation result
+message GetAskResponse {
+  // AskPrice is the price to purchase the contract (equals stake)
+  string ask_price = 1;
+  
+  // Currency is the contract currency
+  string currency = 2;
+  
+  // CurrentSpot is the current market spot price
+  string current_spot = 3;
+  
+  // CurrentSpotTime is the timestamp of the spot price
+  int64 current_spot_time = 4;
+  
+  // Payout is the potential payout if contract wins
+  string payout = 5;
+  
+  // Limits contains applicable trading limits
+  Limits limits = 6;
+}
+
+// GetBidRequest is the request for bid price calculation
+message GetBidRequest {
+  // OptionParameters specifies the contract parameters (must include start_time)
+  OptionParameters option_parameters = 1;
+  
+  // PricingTime is the timestamp for pricing (optional, defaults to current time)
+  // Unix epoch timestamp in seconds
+  optional int64 pricing_time = 2;
+}
+
+// GetBidResponse contains the bid price calculation result
+message GetBidResponse {
+  // BidPrice is the current market value of the contract
+  string bid_price = 1;
+  
+  // IsExpired indicates whether the contract has expired
+  bool is_expired = 2;
+  
+  // CurrentSpot is the current market spot price
+  string current_spot = 3;
+  
+  // CurrentSpotTime is the timestamp of the current spot
+  int64 current_spot_time = 4;
+  
+  // EntrySpot is the contract entry price (first tick after start_time)
+  string entry_spot = 5;
+  
+  // EntrySpotTime is the timestamp of the entry spot
+  int64 entry_spot_time = 6;
+  
+  // ExitSpot is the contract exit price (present if expired)
+  string exit_spot = 7;
+  
+  // ExitSpotTime is the timestamp of the exit spot (present if expired)
+  int64 exit_spot_time = 8;
+  
+  // Barrier is the calculated barrier value
+  string barrier = 9;
+  
+  // StartTime is the contract start time
+  int64 start_time = 10;
+  
+  // ExpiryTime is the contract expiry time
+  int64 expiry_time = 11;
+  
+  // Currency is the contract currency
+  string currency = 12;
+}
