@@ -4,9 +4,21 @@ This template is designed to guide a non-technical team in defining a new financ
 
 ## Part 1: Product Definition
 
-Digital Call/Put options is a binary option. For a Call option, client wins full payout if the symbol's exit price is strictly higher than the barrier. For a Put option, client wins full payout if the symbol's exit price is strictly lower than the barrier. Barrier can be defined by the client. The product accepts relative barrier, absolute barrier or null. If relative barrier is provided by the client, the barrier value can be calculated from the symbol's entry price of the contract. Entry price is the next price after contract start time. If barrier is not provided, the product uses the entry price as the barrier.
+Digital Call/Put options is a binary option. For a Call option, client wins full payout if the symbol's exit price is strictly higher than the barrier. For a Put option, client wins full payout if the symbol's exit price is strictly lower than the barrier. Barrier can be defined by the client. The product accepts relative barrier, absolute barrier or null.
 
-Client loses the stake if contract expire worthless. Client should be able to request for a single contract price or request for a stream of contract prices. Similarly, client should be able to request for the contract value after the contract is purchase. Client can sell the contract at market value before the contract expiry time.
+**Ask Request (Pre-purchase Proposal):**
+- **Inputs**: Client provides `Stake`. `Payout` is not a valid input.
+- **Barrier**: If relative barrier is provided, it is calculated from the **Current Spot Price**. If barrier is not provided, the **Current Spot Price** is used as the barrier.
+- **Pricing**: The Ask Price returned is equal to the input `Stake`. The system calculates the potential `Payout` based on this stake.
+
+**Bid Request (Active/Sold Contract):**
+- **Inputs**: Client must provide the resolved **Absolute Barrier**. Relative barriers are not accepted for active contracts.
+- **Lifecycle**:
+  - **Start Condition**: The contract starts once it receives an entry price (first tick after start time).
+  - **Winning Condition**: Call wins if exit price > barrier. Put wins if exit price < barrier.
+  - **Losing Condition**: Call loses if exit price <= barrier. Put loses if exit price >= barrier.
+  - **Expiry**: Contract expires at the expiry time.
+  - **Early Exit**: Contract can be sold at market value using Cash-or-Nothing Black-Scholes.
 
 ### 1. Contract Request Parameters for Get & Stream endpoints (Inputs)
 *Digital option parameters*
@@ -14,15 +26,17 @@ Client loses the stake if contract expire worthless. Client should be able to re
 *   **Currency**: The payout currency of the contract (e.g., USD, EUR). Required parameter.
 *   **Stake**: The premium paid to enter into a contract. Required parameter.
 *   **Duration**: A string that consists of duration amount and duration unit (e.g. '1m' is 1 minute, '30s' is 30 seconds, '2h' is 2 hours, '5d' is 5 days and '5t' is 5 ticks). Required parameter.
-*   **Barrier**: Relative or absolute barrier. Optional parameter.
-    **Start Time**: The start time of the contract. Only required for bid request.
+*   **Barrier**:
+    - For **Ask (Proposal)**: Relative or absolute barrier. Optional. Defaults to Current Spot if null.
+    - For **Bid (Active)**: **Absolute Barrier** required.
+*   **Start Time**: The start time of the contract. Only required for bid request.
 *Pricing time*: Pricing request epoch time. Optional parameter.
 
 ### 2. Ask Response
 *   **Current Spot**: Spot price of the underlying asset.
 *   **Current Spot Time**: Time associated with the spot price.
-*   **Payout**: Potential payout.
-*   **Ask Price**: Ask price.
+*   **Payout**: Potential payout calculated by the system.
+*   **Ask Price**: Ask price (equals input Stake).
 *   **Currency**: The contract quoted currency.
 *   **Limits**: Contains option specific trading limits.
 
@@ -49,8 +63,10 @@ Client loses the stake if contract expire worthless. Client should be able to re
 *   **Inputs**: Spot price, Barrier, Duration in years, Payout currency interest rate, Quanto drift, Volatility.
     *   **Market Data Sources**: Spot prices are fetched from `BOM::MarketData` equivalent services. Interest rates and Volatility surfaces are loaded from configuration files (e.g., `config.yml`) and benchmark CSV files (e.g., `SD_GBPJPY.csv`).
 *   **Formula/Logic**:
-    *   **Barrier Calculation**: If barrier is provided, check if it's absolute or relative barrier. Relative barrier is a string with '+' or '-' sign. Relative barrier value can be calculated from symbol's entry price. If barrier is not provided, use entry price as barrier.
-    *   **Time Calculation for Ticks**: For tick-based durations (e.g., '5t'), the duration must be converted to an equivalent time duration based on the tick generation interval before being passed to the pricing model. The Black-Scholes model requires time as a continuous variable.
+    *   **Barrier Calculation**:
+        - Relative barrier (e.g., "+10") is calculated as `Current Spot + Offset`.
+        - If barrier is missing, `Current Spot` is used.
+    *   **Time Calculation for Ticks**: For tick-based durations (e.g., '5t'), convert to time duration by multiplying the number of ticks by the **tick generation interval**. The tick generation interval is a static property of the underlying market (e.g. from market configuration).
     *   **Payout Calculation**: Use the **Cash-or-Nothing Black-Scholes** formula. This pays a fixed cash amount if the option expires in-the-money, and zero otherwise.
     *   **Limits**: Min stake and Max payout are defined in per-symbol configuration (e.g., `staking_limits`).
     *   **Commission**: Commission is deducted from the potential payout. The commission formula is defined as: `buy_commission = financialrounding('price', currency, ask_price - theo_price)`. Commission rates are defined in per-symbol configuration.
