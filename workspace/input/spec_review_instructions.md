@@ -18,7 +18,11 @@ Your review should focus on the following aspects:
 2. Clarity: Is the specification clear and unambiguous? Are there any sections that could be misinterpreted by developers?
 3. Feasibility: Are the defined features and functionalities feasible to implement within a Go microservice architecture? Are there any technical challenges that need to be addressed?
 
-> You should not read any other files at this stage, only `product_brief.md`.
+Follow these guidelines during your review:
+
+- You should not read any other files at this stage, only `product_brief.md`.
+- Do not make things up.
+- If the specification looks perfect, you do not need to forcefully find issues.
 
 Deliverable 1: Write a list of any issues, ambiguities, or challenges you identify during your review. Use `identified_issues.md` file to document this.
 
