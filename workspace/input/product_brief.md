@@ -47,11 +47,13 @@ Client loses the stake if contract expire worthless. Client should be able to re
 ### 5. Pricing Logic (The "Ask")
 *How do we calculate the proposal before purchase?*
 *   **Inputs**: Spot price, Barrier, Duration in years, Payout currency interest rate, Quanto drift, Volatility.
+    *   **Market Data Sources**: Spot prices are fetched from `BOM::MarketData` equivalent services. Interest rates and Volatility surfaces are loaded from configuration files (e.g., `config.yml`) and benchmark CSV files (e.g., `SD_GBPJPY.csv`).
 *   **Formula/Logic**:
-    *   How are barriers calculated? If barrier is provided, check if it's absolute or relative barrier. Relative barrier is a string with '+' or '-' sign. Relative barrier value can be calculated from symbol's entry price. If barrier is not provided, use entry price as barrier.
-    *   How is the potential payout calculated? Use standard black & scholes formula for payout calculation.
-    *   Are there limits (Max Payout, Min Stake)? Min stake and max payout should be defined by symbol.
-    *   Commission is deducted from potential payout. Commission should be defined by symbol.
+    *   **Barrier Calculation**: If barrier is provided, check if it's absolute or relative barrier. Relative barrier is a string with '+' or '-' sign. Relative barrier value can be calculated from symbol's entry price. If barrier is not provided, use entry price as barrier.
+    *   **Time Calculation for Ticks**: For tick-based durations (e.g., '5t'), the duration must be converted to an equivalent time duration based on the tick generation interval before being passed to the pricing model. The Black-Scholes model requires time as a continuous variable.
+    *   **Payout Calculation**: Use the **Cash-or-Nothing Black-Scholes** formula. This pays a fixed cash amount if the option expires in-the-money, and zero otherwise.
+    *   **Limits**: Min stake and Max payout are defined in per-symbol configuration (e.g., `staking_limits`).
+    *   **Commission**: Commission is deducted from the potential payout. The commission formula is defined as: `buy_commission = financialrounding('price', currency, ask_price - theo_price)`. Commission rates are defined in per-symbol configuration.
 
 ### 6. Lifecycle & State Machine (The "Bid" / Active Contract)
 *What happens after purchase?*
@@ -60,7 +62,7 @@ Client loses the stake if contract expire worthless. Client should be able to re
 *   **Winning Condition**: For a Call option, client wins when the exit price is strictly higher than the barrier. For a Put option, client wins when the exit price is strictly lower than the barrier.
 *   **Losing Condition**: For a Call option, client loses when the exit prcie is lower or equal than the barrier. For a Put option, client loses when the exit price is lower or equal than the barrier.
 *   **Expiry Condition**: The contract expires at the expiry time.
-*   **Early Exit**: The contract can be sold at market. Contract value can be calculated using the same pricing logic.
+*   **Early Exit**: The contract can be sold at market. Contract value can be calculated using the same pricing logic (Cash-or-Nothing Black-Scholes).
 
 ---
 
@@ -69,9 +71,8 @@ Client loses the stake if contract expire worthless. Client should be able to re
 *Use this section to generate the Go service code based on the definitions above.*
 
 ### 1. Service Code Structure
-The service should follow standard go template. Steps to clone template
-*   cd /Users/junbon/Project
-*   check if go-templates command exists. Delete if exists.
+The service should follow standard go template.
+*   Use the existing `go-templates` if available in the workspace or standard project structure.
 
 ### 2. Proto Definition
 
