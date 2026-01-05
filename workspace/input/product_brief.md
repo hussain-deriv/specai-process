@@ -9,15 +9,15 @@ Digital Call/Put options is a binary option. For a Call option, client wins full
 **Ask Request (Pre-purchase Proposal):**
 - **Inputs**: Client provides `Stake`. `Payout` is not a valid input.
 - **Barrier**: If relative barrier is provided, it is calculated from the **Current Spot Price**. If barrier is not provided, the **Current Spot Price** is used as the barrier.
-- **Pricing**: The Ask Price returned is equal to the input `Stake`. The system calculates the potential `Payout` based on this stake.
+- **Pricing**: The Ask Price returned is equal to the input `Stake`. The system calculates the potential `Payout` based on this stake and the theoretical probability + commission markup.
 
 **Bid Request (Active/Sold Contract):**
-- **Inputs**: Client must provide the resolved **Absolute Barrier**. Relative barriers are not accepted for active contracts.
+- **Inputs**: Client must provide the resolved **Absolute Barrier** and **Start Time**. Relative barriers are not accepted for active contracts.
 - **Lifecycle**:
-  - **Start Condition**: The contract starts once it receives an entry price (first tick after start time).
+  - **Start Condition**: The contract starts once it receives an entry price (first tick at or after start time).
   - **Winning Condition**: Call wins if exit price > barrier. Put wins if exit price < barrier.
   - **Losing Condition**: Call loses if exit price <= barrier. Put loses if exit price >= barrier.
-  - **Expiry**: Contract expires at the expiry time.
+  - **Expiry**: Contract expires at the expiry time (time-based) or after N ticks (tick-based).
   - **Early Exit**: Contract can be sold at market value using Cash-or-Nothing Black-Scholes.
 
 ### 1. Contract Request Parameters for Get & Stream endpoints (Inputs)
@@ -66,19 +66,33 @@ Digital Call/Put options is a binary option. For a Call option, client wins full
     *   **Barrier Calculation**:
         - Relative barrier (e.g., "+10") is calculated as `Current Spot + Offset`.
         - If barrier is missing, `Current Spot` is used.
-    *   **Time Calculation for Ticks**: For tick-based durations (e.g., '5t'), convert to time duration by multiplying the number of ticks by the **tick generation interval**. The tick generation interval is a static property of the underlying market (e.g. from market configuration).
+    *   **Time Calculation for Ticks**: 
+        - For tick-based durations (e.g., '5t'), the expiry is **event-based**. The contract expires after the N-th valid market tick arrives after the start time.
+        - Note: There is typically a maximum waiting period (e.g., 5 minutes) for tick-based contracts.
     *   **Payout Calculation**: Use the **Cash-or-Nothing Black-Scholes** formula. This pays a fixed cash amount if the option expires in-the-money, and zero otherwise.
-    *   **Limits**: Min stake and Max payout are defined in per-symbol configuration (e.g., `staking_limits`).
-    *   **Commission**: Commission is deducted from the potential payout. The commission formula is defined as: `buy_commission = financialrounding('price', currency, ask_price - theo_price)`. Commission rates are defined in per-symbol configuration.
+    *   **Limits**: Min stake and Max payout are defined in **per-symbol configuration** (dynamically loaded from files like `contract_types.yml` and `contract_categories.yml`).
+    *   **Commission**: 
+        - Commission is a **pricing markup** included in the Ask Price.
+        - `Ask Price = Theoretical Price + Commission`.
+        - `Commission = Number of Contracts * (Ask Probability - Theoretical Probability)`.
+        - No commission is deducted from the final payout if the contract is held to expiry.
+    *   **Financial Rounding**: 
+        - Amounts and prices must be rounded according to the currency's precision (e.g., 2 decimals for USD, 0 for JPY).
+        - Rounding method is typically "nearest" (half-up).
 
 ### 6. Lifecycle & State Machine (The "Bid" / Active Contract)
 *What happens after purchase?*
 *   **Start Condition**: The contract starts once it receives an entry price.
+    - **Entry Spot Determination**: The system must look up the **first valid tick at or after the Start Time** from historical market data.
 *   **Update Frequency**: Contract price should be updated when it receives a new tick or 5 seconds after the previous price update. Update stops after contract expires.
 *   **Winning Condition**: For a Call option, client wins when the exit price is strictly higher than the barrier. For a Put option, client wins when the exit price is strictly lower than the barrier.
 *   **Losing Condition**: For a Call option, client loses when the exit prcie is lower or equal than the barrier. For a Put option, client loses when the exit price is lower or equal than the barrier.
-*   **Expiry Condition**: The contract expires at the expiry time.
-*   **Early Exit**: The contract can be sold at market. Contract value can be calculated using the same pricing logic (Cash-or-Nothing Black-Scholes).
+*   **Expiry Condition**: 
+    - **Time-based**: Expires at the calculated Expiry Time.
+    - **Tick-based**: Expires when the N-th tick arrives (event-driven).
+*   **Early Exit**: The contract can be sold at market. 
+    - `Bid Price = Theoretical Price - Sell Commission`.
+    - `Sell Commission = Number of Contracts * (Theoretical Probability - Bid Probability)`.
 
 ---
 

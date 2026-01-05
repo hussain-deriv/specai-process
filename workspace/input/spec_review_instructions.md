@@ -43,7 +43,11 @@ Deliverable 2: Write down the questions you asked the expert and their answers (
 
 ## 3. Update Product Specification
 
-Update `product_brief.md` to address issues you identified in your review. 
+Update `product_brief.md` to:
+
+- address issues you identified in your review. 
+- incorporate insights gained from your interactions with the legacy code expert.
+- ensure the specification is clear, complete, and feasible for implementation in a Go microservice architecture.
 
 You must follow these guidelines when updating the product specification:
 
